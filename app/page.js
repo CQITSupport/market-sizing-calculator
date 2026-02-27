@@ -1,15 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Calculator, TrendingUp, Target, DollarSign, Info, ChevronDown, ChevronUp, Download, Share2 } from 'lucide-react';
+import { Calculator, TrendingUp, Target, DollarSign, Info, ChevronDown, ChevronUp, Plus, Trash2, Share2 } from 'lucide-react';
 
 export default function MarketSizingCalculator() {
-  const [method, setMethod] = useState('bottom-up');
-  const [topDownTAM, setTopDownTAM] = useState(50000000000);
-  const [numCustomers, setNumCustomers] = useState(5000000);
-  const [revenuePerCustomer, setRevenuePerCustomer] = useState(1200);
+  const [segments, setSegments] = useState([
+    { id: 1, name: 'Segment 1', customers: 1000000, revenuePerCustomer: 1200, samPercent: 60 },
+  ]);
   const [geographicReach, setGeographicReach] = useState(25);
-  const [targetSegmentFit, setTargetSegmentFit] = useState(60);
+  const [geographicNotes, setGeographicNotes] = useState('');
   const [regulatoryAccess, setRegulatoryAccess] = useState(100);
   const [marketShare, setMarketShare] = useState(5);
   const [yearsToAchieve, setYearsToAchieve] = useState(5);
@@ -17,12 +16,51 @@ export default function MarketSizingCalculator() {
   const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showTips, setShowTips] = useState(false);
 
+  const addSegment = () => {
+    const newId = Math.max(...segments.map(s => s.id), 0) + 1;
+    setSegments([...segments, { 
+      id: newId, 
+      name: `Segment ${newId}`, 
+      customers: 100000, 
+      revenuePerCustomer: 1000,
+      samPercent: 50
+    }]);
+  };
+
+  const removeSegment = (id) => {
+    if (segments.length > 1) {
+      setSegments(segments.filter(s => s.id !== id));
+    }
+  };
+
+  const updateSegment = (id, field, value) => {
+    setSegments(segments.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ));
+  };
+
   const calculations = useMemo(() => {
-    const tam = method === 'top-down' ? topDownTAM : numCustomers * revenuePerCustomer;
-    const tamToSamRate = (geographicReach / 100) * (targetSegmentFit / 100) * (regulatoryAccess / 100);
-    const sam = tam * tamToSamRate;
+    // TAM: Sum of all segments
+    const segmentTAMs = segments.map(s => ({
+      ...s,
+      tam: s.customers * s.revenuePerCustomer
+    }));
+    const tam = segmentTAMs.reduce((sum, s) => sum + s.tam, 0);
+    
+    // SAM: Apply geographic reach, then per-segment target fit, then regulatory
+    const segmentSAMs = segmentTAMs.map(s => ({
+      ...s,
+      samBeforeRegulatory: s.tam * (geographicReach / 100) * (s.samPercent / 100),
+      sam: s.tam * (geographicReach / 100) * (s.samPercent / 100) * (regulatoryAccess / 100)
+    }));
+    const sam = segmentSAMs.reduce((sum, s) => sum + s.sam, 0);
+    
+    const tamToSamRate = tam > 0 ? sam / tam : 0;
+    
+    // SOM
     const som = sam * (marketShare / 100);
 
+    // Projections
     const projections = [];
     for (let year = 0; year <= 5; year++) {
       const factor = Math.pow(1 + growthRate / 100, year);
@@ -34,8 +72,8 @@ export default function MarketSizingCalculator() {
       });
     }
 
-    return { tam, sam, som, tamToSamRate, projections };
-  }, [method, topDownTAM, numCustomers, revenuePerCustomer, geographicReach, targetSegmentFit, regulatoryAccess, marketShare, growthRate]);
+    return { tam, sam, som, tamToSamRate, projections, segmentTAMs, segmentSAMs };
+  }, [segments, geographicReach, regulatoryAccess, marketShare, growthRate]);
 
   const formatCurrency = (value) => {
     if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
@@ -57,22 +95,33 @@ export default function MarketSizingCalculator() {
   const formatPercent = (value) => `${(value * 100).toFixed(1)}%`;
 
   const copyToClipboard = () => {
+    const segmentDetails = segments.map(s => {
+      const segData = calculations.segmentTAMs.find(st => st.id === s.id);
+      return `  - ${s.name}: ${s.customers.toLocaleString()} customers × ${formatFullCurrency(s.revenuePerCustomer)} = ${formatFullCurrency(segData?.tam || 0)}`;
+    }).join('\n');
+
+    const samSegmentDetails = calculations.segmentSAMs.map(s => {
+      return `  - ${s.name}: ${s.samPercent}% target fit → ${formatFullCurrency(s.sam)}`;
+    }).join('\n');
+
     const text = `Market Sizing Analysis
 ━━━━━━━━━━━━━━━━━━━━━━
 TAM: ${formatFullCurrency(calculations.tam)}
 SAM: ${formatFullCurrency(calculations.sam)} (${formatPercent(calculations.tamToSamRate)} of TAM)
 SOM: ${formatFullCurrency(calculations.som)} (${marketShare}% market share)
 
+TAM by Segment:
+${segmentDetails}
+
+SAM by Segment:
+${samSegmentDetails}
+
+Geographic Reach: ${geographicReach}%
+${geographicNotes ? `Geographic Notes: ${geographicNotes}` : ''}
+
 5-Year Projection (${growthRate}% CAGR):
 TAM: ${formatFullCurrency(calculations.projections[5].tam)}
-SOM: ${formatFullCurrency(calculations.projections[5].som)}
-
-Assumptions:
-- Method: ${method === 'top-down' ? 'Top-Down' : 'Bottom-Up'}
-${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Revenue/Customer: ${formatFullCurrency(revenuePerCustomer)}` : `- Industry Size: ${formatFullCurrency(topDownTAM)}`}
-- Geographic Reach: ${geographicReach}%
-- Target Segment Fit: ${targetSegmentFit}%
-- Expected Market Share: ${marketShare}%`;
+SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
     
     navigator.clipboard.writeText(text);
     alert('Results copied to clipboard!');
@@ -115,13 +164,14 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
       <div className="max-w-4xl mx-auto p-4 md:p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
-            <Calculator size={16} />
-            Free Market Sizing Tool
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">TAM / SAM / SOM Calculator</h1>
+          <img 
+            src="/logo.png" 
+            alt="CQuence Health" 
+            className="h-16 mx-auto mb-4"
+          />
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">CQuence Market Sizing Tool</h1>
           <p className="text-gray-600 max-w-xl mx-auto">
-            Calculate your Total Addressable, Serviceable Available, and Serviceable Obtainable Markets for investor-ready market sizing.
+            Build your market sizing from the bottom up, segment by segment.
           </p>
         </div>
 
@@ -130,7 +180,7 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
           <ResultCard 
             title="Total Addressable Market (TAM)" 
             value={calculations.tam} 
-            subtitle="The entire market demand if you achieved 100% market share" 
+            subtitle={`${segments.length} segment${segments.length > 1 ? 's' : ''} combined`}
             color="bg-blue-50 border-blue-200"
             icon={Target}
           />
@@ -138,7 +188,7 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
             <ResultCard 
               title="Serviceable Available Market (SAM)" 
               value={calculations.sam} 
-              subtitle={`${formatPercent(calculations.tamToSamRate)} of TAM — your reachable market`} 
+              subtitle={`${formatPercent(calculations.tamToSamRate)} of TAM`} 
               color="bg-emerald-50 border-emerald-200"
               icon={DollarSign}
             />
@@ -163,70 +213,99 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
           </button>
         </div>
 
-        {/* TAM Section */}
+        {/* TAM Section - Segments */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Target className="text-blue-600" size={20} />
-            <h2 className="text-lg font-semibold">1. Total Addressable Market (TAM)</h2>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Target className="text-blue-600" size={20} />
+              <h2 className="text-lg font-semibold">1. Total Addressable Market (TAM)</h2>
+            </div>
           </div>
-          <p className="text-sm text-gray-500 mb-4">The total market demand for your product or service</p>
+          <p className="text-sm text-gray-500 mb-4">Build your TAM by defining customer segments (e.g., hospitals, specialty clinics, retail pharmacies)</p>
           
-          <div className="flex gap-2 mb-5">
-            <button
-              onClick={() => setMethod('bottom-up')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                method === 'bottom-up' 
-                  ? 'bg-blue-600 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Bottom-Up
-              <span className="block text-xs opacity-75 mt-0.5">Customer × Revenue</span>
-            </button>
-            <button
-              onClick={() => setMethod('top-down')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                method === 'top-down' 
-                  ? 'bg-blue-600 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Top-Down
-              <span className="block text-xs opacity-75 mt-0.5">Market Research</span>
-            </button>
+          {/* Segments */}
+          <div className="space-y-4">
+            {segments.map((segment, index) => {
+              const segmentTAM = calculations.segmentTAMs.find(s => s.id === segment.id);
+              return (
+                <div key={segment.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <input
+                      type="text"
+                      value={segment.name}
+                      onChange={(e) => updateSegment(segment.id, 'name', e.target.value)}
+                      className="font-medium text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5"
+                      placeholder="Segment name"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-blue-600">
+                        {formatCurrency(segmentTAM?.tam || 0)}
+                      </span>
+                      {segments.length > 1 && (
+                        <button
+                          onClick={() => removeSegment(segment.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Potential Customers</label>
+                      <input
+                        type="number"
+                        value={segment.customers}
+                        onChange={(e) => updateSegment(segment.id, 'customers', Number(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        min={0}
+                        step={1000}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Avg Revenue per Customer</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={segment.revenuePerCustomer}
+                          onChange={(e) => updateSegment(segment.id, 'revenuePerCustomer', Number(e.target.value))}
+                          className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          min={0}
+                          step={100}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {method === 'top-down' ? (
-            <InputField
-              label="Total Industry Market Size"
-              value={topDownTAM}
-              onChange={setTopDownTAM}
-              prefix="$"
-              hint="Use data from industry reports like Gartner, IDC, Statista, or Grand View Research"
-              step={1000000000}
-            />
-          ) : (
-            <>
-              <InputField
-                label="Number of Potential Customers"
-                value={numCustomers}
-                onChange={setNumCustomers}
-                hint="Total number of potential customers who could use your product globally"
-                step={100000}
-              />
-              <InputField
-                label="Average Annual Revenue per Customer"
-                value={revenuePerCustomer}
-                onChange={setRevenuePerCustomer}
-                prefix="$"
-                hint="Expected yearly spend per customer (ACV for B2B, annual spend for B2C)"
-                step={100}
-              />
-              <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
-                <strong>Bottom-Up TAM:</strong> {numCustomers.toLocaleString()} customers × {formatFullCurrency(revenuePerCustomer)} = {formatFullCurrency(calculations.tam)}
-              </div>
-            </>
-          )}
+          <button
+            onClick={addSegment}
+            className="mt-4 w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+          >
+            <Plus size={20} />
+            Add Segment
+          </button>
+
+          {/* TAM Summary */}
+          <div className="mt-4 bg-blue-50 rounded-lg p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium text-gray-700">Total TAM</span>
+              <span className="text-xl font-bold text-blue-600">{formatCurrency(calculations.tam)}</span>
+            </div>
+            <div className="space-y-1">
+              {calculations.segmentTAMs.map(s => (
+                <div key={s.id} className="flex justify-between text-sm text-gray-600">
+                  <span>{s.name}</span>
+                  <span>{formatCurrency(s.tam)} ({((s.tam / calculations.tam) * 100).toFixed(1)}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* SAM Section */}
@@ -235,24 +314,80 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
             <DollarSign className="text-emerald-600" size={20} />
             <h2 className="text-lg font-semibold">2. Serviceable Available Market (SAM)</h2>
           </div>
-          <p className="text-sm text-gray-500 mb-4">The portion of TAM you can realistically serve given constraints</p>
+          <p className="text-sm text-gray-500 mb-4">Filter your TAM to what you can realistically serve</p>
           
-          <InputField
-            label="Geographic Reach"
-            value={geographicReach}
-            onChange={setGeographicReach}
-            suffix="%"
-            hint="What percentage of the global market can you physically or digitally serve? (e.g., US only = ~25%)"
-            max={100}
-          />
-          <InputField
-            label="Target Segment Fit"
-            value={targetSegmentFit}
-            onChange={setTargetSegmentFit}
-            suffix="%"
-            hint="What percentage of your geographic market matches your ideal customer profile?"
-            max={100}
-          />
+          {/* Geographic Reach */}
+          <div className="mb-6">
+            <InputField
+              label="Geographic Reach"
+              value={geographicReach}
+              onChange={setGeographicReach}
+              suffix="%"
+              hint="What percentage of the global market can you physically or digitally serve?"
+              max={100}
+            />
+            <div className="mt-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Geographic Reach Notes
+                <span className="font-normal text-gray-500 ml-1">(Describe your specific geographic scope)</span>
+              </label>
+              <textarea
+                value={geographicNotes}
+                onChange={(e) => setGeographicNotes(e.target.value)}
+                placeholder="Example: Initially targeting US market only - focusing on Northeast and West Coast regions. Key states: CA, NY, MA, WA, TX. Expansion to Canada and UK planned for Year 3..."
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* Per-Segment Target Fit */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Target Segment Fit
+              <span className="font-normal text-gray-500 ml-1">(What % of each segment can you serve?)</span>
+            </label>
+            <div className="space-y-3">
+              {segments.map(segment => {
+                const segmentSAM = calculations.segmentSAMs.find(s => s.id === segment.id);
+                return (
+                  <div key={segment.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-700">{segment.name}</span>
+                      <span className="text-sm text-emerald-600 font-medium">
+                        SAM: {formatCurrency(segmentSAM?.sam || 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={segment.samPercent}
+                        onChange={(e) => updateSegment(segment.id, 'samPercent', Number(e.target.value))}
+                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                      />
+                      <div className="relative w-20">
+                        <input
+                          type="number"
+                          value={segment.samPercent}
+                          onChange={(e) => updateSegment(segment.id, 'samPercent', Math.min(100, Math.max(0, Number(e.target.value))))}
+                          className="w-full px-2 py-1 text-right border border-gray-300 rounded-lg text-sm"
+                          min={0}
+                          max={100}
+                        />
+                        <span className="absolute right-2 top-1 text-gray-400 text-sm">%</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatCurrency(segmentSAM?.tam || 0)} TAM × {geographicReach}% geo × {segment.samPercent}% fit
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <InputField
             label="Regulatory/Technical Accessibility"
             value={regulatoryAccess}
@@ -262,8 +397,14 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
             max={100}
           />
           
-          <div className="bg-emerald-50 rounded-lg p-3 text-sm text-emerald-800">
-            <strong>TAM → SAM Conversion:</strong> {geographicReach}% × {targetSegmentFit}% × {regulatoryAccess}% = {formatPercent(calculations.tamToSamRate)}
+          <div className="bg-emerald-50 rounded-lg p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium text-gray-700">Total SAM</span>
+              <span className="text-xl font-bold text-emerald-600">{formatCurrency(calculations.sam)}</span>
+            </div>
+            <p className="text-sm text-gray-600">
+              {formatPercent(calculations.tamToSamRate)} of TAM ({formatCurrency(calculations.tam)})
+            </p>
           </div>
         </div>
 
@@ -412,7 +553,7 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
                   <li>❌ Projecting {">"} 30% market share in established markets</li>
                   <li>❌ Ignoring regulatory or technical barriers</li>
                   <li>❌ Using outdated market research (update annually)</li>
-                  <li>❌ Confusing addressable market with total industry size</li>
+                  <li>❌ Not validating segment sizes with bottom-up calculations</li>
                 </ul>
               </div>
             </div>
@@ -436,21 +577,20 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
             <div className="px-6 pb-6 border-t border-gray-100">
               <div className="mt-4 space-y-4 text-sm text-gray-700">
                 <div>
-                  <h4 className="font-semibold text-gray-900">1. Choose Your TAM Method</h4>
-                  <p><strong>Bottom-Up</strong> (recommended): More credible, based on your specific customer count and pricing. Best for new/niche markets.</p>
-                  <p><strong>Top-Down:</strong> Uses existing market research. Best when reliable industry reports exist.</p>
+                  <h4 className="font-semibold text-gray-900">1. Build Your TAM by Segment</h4>
+                  <p>Think about distinct customer groups who would use your product differently. For healthcare: hospitals, specialty clinics, retail pharmacies. For B2B SaaS: enterprise, mid-market, SMB. Each segment has different customer counts and willingness to pay.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">2. Be Realistic with SAM</h4>
-                  <p>Don't use global TAM unless you can truly serve globally from day one. Consider geographic, regulatory, and technical constraints.</p>
+                  <h4 className="font-semibold text-gray-900">2. Be Specific About Geographic Reach</h4>
+                  <p>Don't just enter a percentage — document exactly which regions, countries, or states you're targeting and why. This forces realistic thinking and helps communicate your strategy to investors.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">3. Stay Conservative on SOM</h4>
-                  <p>New entrants rarely exceed 5-10% market share. VCs are skeptical of aggressive projections.</p>
+                  <h4 className="font-semibold text-gray-900">3. Set Target Fit Per Segment</h4>
+                  <p>You may have strong fit with hospitals (80%) but weaker fit with retail pharmacies (30%). Be honest about where your product truly solves a problem vs. where it's a stretch.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">4. Validate Both Ways</h4>
-                  <p>If using top-down, sanity-check with bottom-up calculations. If they differ wildly, investigate why.</p>
+                  <h4 className="font-semibold text-gray-900">4. Stay Conservative on SOM</h4>
+                  <p>New entrants rarely exceed 5-10% market share. VCs are skeptical of aggressive projections — it's better to under-promise and over-deliver.</p>
                 </div>
               </div>
             </div>
@@ -459,9 +599,9 @@ ${method === 'bottom-up' ? `- Customers: ${numCustomers.toLocaleString()}\n- Rev
 
         {/* Footer */}
         <footer className="text-center text-sm text-gray-500 py-8">
-          <p>Built for founders, by founders. No data is stored or shared.</p>
+          <p>© CQuence Health. No data is stored or shared.</p>
           <p className="mt-2">
-            <span className="text-blue-600">Blue inputs</span> are editable • Results update automatically
+            Results update automatically as you edit
           </p>
         </footer>
       </div>
