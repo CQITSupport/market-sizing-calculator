@@ -169,7 +169,7 @@ SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
             alt="CQuence Health" 
             className="h-16 mx-auto mb-4"
           />
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">CQuence Market Sizing Tool</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Market Sizing Tool</h1>
           <p className="text-gray-600 max-w-xl mx-auto">
             Build your market sizing from the bottom up, segment by segment.
           </p>
