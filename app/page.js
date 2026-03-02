@@ -134,6 +134,28 @@ SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 20;
     
+    // Load and add logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+        logoImg.src = '/logo.png';
+      });
+      
+      // Calculate logo dimensions (maintain aspect ratio, max height 20)
+      const maxHeight = 20;
+      const ratio = logoImg.width / logoImg.height;
+      const logoHeight = maxHeight;
+      const logoWidth = logoHeight * ratio;
+      
+      doc.addImage(logoImg, 'PNG', (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
+      y += logoHeight + 10;
+    } catch (e) {
+      console.log('Logo not loaded, continuing without it');
+    }
+    
     // Title
     doc.setFontSize(24);
     doc.setTextColor(30, 58, 95);
