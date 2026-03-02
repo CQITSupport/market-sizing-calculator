@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Calculator, TrendingUp, Target, DollarSign, Info, ChevronDown, ChevronUp, Plus, Trash2, Share2 } from 'lucide-react';
+import { Calculator, TrendingUp, Target, DollarSign, Info, ChevronDown, ChevronUp, Plus, Trash2, Share2, Download } from 'lucide-react';
 
 export default function MarketSizingCalculator() {
   const [segments, setSegments] = useState([
@@ -127,6 +127,156 @@ SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
     alert('Results copied to clipboard!');
   };
 
+  const generatePDF = async () => {
+    const jsPDF = (await import('jspdf')).default;
+    const doc = new jsPDF();
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+    
+    // Title
+    doc.setFontSize(24);
+    doc.setTextColor(30, 58, 95);
+    doc.text('Market Sizing Analysis', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated ${new Date().toLocaleDateString()}`, pageWidth / 2, y, { align: 'center' });
+    y += 15;
+    
+    // Summary boxes
+    doc.setFillColor(239, 246, 255);
+    doc.rect(14, y, 55, 25, 'F');
+    doc.setFillColor(236, 253, 245);
+    doc.rect(77, y, 55, 25, 'F');
+    doc.setFillColor(255, 251, 235);
+    doc.rect(140, y, 55, 25, 'F');
+    
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text('TAM', 41, y + 7, { align: 'center' });
+    doc.text('SAM', 104, y + 7, { align: 'center' });
+    doc.text('SOM', 167, y + 7, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.setTextColor(30, 58, 95);
+    doc.text(formatCurrency(calculations.tam), 41, y + 18, { align: 'center' });
+    doc.setTextColor(5, 150, 105);
+    doc.text(formatCurrency(calculations.sam), 104, y + 18, { align: 'center' });
+    doc.setTextColor(217, 119, 6);
+    doc.text(formatCurrency(calculations.som), 167, y + 18, { align: 'center' });
+    
+    y += 35;
+    
+    // TAM by Segment
+    doc.setFontSize(14);
+    doc.setTextColor(30, 58, 95);
+    doc.text('TAM by Segment', 14, y);
+    y += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(55, 65, 81);
+    calculations.segmentTAMs.forEach(s => {
+      const percentage = ((s.tam / calculations.tam) * 100).toFixed(1);
+      doc.text(`${s.name}: ${s.customers.toLocaleString()} customers × ${formatFullCurrency(s.revenuePerCustomer)} = ${formatCurrency(s.tam)} (${percentage}%)`, 14, y);
+      y += 6;
+    });
+    
+    y += 5;
+    doc.setFontSize(11);
+    doc.setTextColor(30, 58, 95);
+    doc.text(`Total TAM: ${formatFullCurrency(calculations.tam)}`, 14, y);
+    y += 12;
+    
+    // SAM Details
+    doc.setFontSize(14);
+    doc.setTextColor(30, 58, 95);
+    doc.text('SAM Calculation', 14, y);
+    y += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(55, 65, 81);
+    doc.text(`Geographic Reach: ${geographicReach}%`, 14, y);
+    y += 6;
+    
+    if (geographicNotes) {
+      const splitNotes = doc.splitTextToSize(`Geographic Notes: ${geographicNotes}`, pageWidth - 28);
+      doc.text(splitNotes, 14, y);
+      y += splitNotes.length * 5 + 3;
+    }
+    
+    doc.text(`Regulatory/Technical Accessibility: ${regulatoryAccess}%`, 14, y);
+    y += 8;
+    
+    doc.text('Target Segment Fit:', 14, y);
+    y += 6;
+    calculations.segmentSAMs.forEach(s => {
+      doc.text(`  ${s.name}: ${s.samPercent}% fit → ${formatCurrency(s.sam)}`, 14, y);
+      y += 6;
+    });
+    
+    y += 3;
+    doc.setFontSize(11);
+    doc.setTextColor(5, 150, 105);
+    doc.text(`Total SAM: ${formatFullCurrency(calculations.sam)} (${formatPercent(calculations.tamToSamRate)} of TAM)`, 14, y);
+    y += 12;
+    
+    // SOM
+    doc.setFontSize(14);
+    doc.setTextColor(30, 58, 95);
+    doc.text('SOM Calculation', 14, y);
+    y += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(55, 65, 81);
+    doc.text(`Expected Market Share: ${marketShare}%`, 14, y);
+    y += 6;
+    doc.text(`Time to Achieve: ${yearsToAchieve} years`, 14, y);
+    y += 6;
+    
+    doc.setFontSize(11);
+    doc.setTextColor(217, 119, 6);
+    doc.text(`Total SOM: ${formatFullCurrency(calculations.som)}`, 14, y);
+    y += 15;
+    
+    // Growth Projections
+    doc.setFontSize(14);
+    doc.setTextColor(30, 58, 95);
+    doc.text(`5-Year Growth Projections (${growthRate}% CAGR)`, 14, y);
+    y += 8;
+    
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Year', 20, y);
+    doc.text('TAM', 60, y);
+    doc.text('SAM', 110, y);
+    doc.text('SOM', 160, y);
+    y += 2;
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 5;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(55, 65, 81);
+    calculations.projections.forEach(row => {
+      const yearLabel = row.year === 0 ? 'Today' : `Year ${row.year}`;
+      doc.text(yearLabel, 20, y);
+      doc.text(formatCurrency(row.tam), 60, y);
+      doc.text(formatCurrency(row.sam), 110, y);
+      doc.text(formatCurrency(row.som), 160, y);
+      y += 6;
+    });
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Generated by CQuence Health Market Sizing Tool', pageWidth / 2, 285, { align: 'center' });
+    
+    doc.save('market-sizing-analysis.pdf');
+  };
+
   const InputField = ({ label, value, onChange, prefix = '', suffix = '', hint = '', min = 0, max, step = 1 }) => (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -169,7 +319,7 @@ SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
             alt="CQuence Health" 
             className="h-16 mx-auto mb-4"
           />
-       <h1 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">Market Sizing Tool</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">CQuence Market Sizing Tool</h1>
           <p className="text-gray-600 max-w-xl mx-auto">
             Build your market sizing from the bottom up, segment by segment.
           </p>
@@ -204,6 +354,13 @@ SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
 
         {/* Action Buttons */}
         <div className="flex gap-3 mb-6">
+          <button
+            onClick={generatePDF}
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <Download size={16} />
+            Download PDF
+          </button>
           <button
             onClick={copyToClipboard}
             className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
