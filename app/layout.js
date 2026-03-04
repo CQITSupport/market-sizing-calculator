@@ -2,7 +2,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'Market Sizing Tool | TAM SAM SOM Calculator',
-  description: 'Calculate your Total Addressable Market (TAM), Serviceable Available Market (SAM), and Serviceable Obtainable Market (SOM) for fundraising and strategic planning. Build your market sizing from the bottom up with segments, geographic reach, and growth projections.',
+  description: 'Calculate your Total Addressable Market (TAM), Serviceable Available Market (SAM), and Serviceable Obtainable Market (SOM) for fundraising and strategic planning. Build your market sizing, segment by segment, with geographic reach and growth projections.',
   keywords: 'TAM, SAM, SOM, market sizing, startup, fundraising, market research, business planning, CQuence Health',
 };
 
@@ -11,7 +11,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <head>
         <meta property="og:title" content="Market Sizing Tool | TAM SAM SOM Calculator" />
-        <meta property="og:description" content="Calculate your Total Addressable Market (TAM), Serviceable Available Market (SAM), and Serviceable Obtainable Market (SOM) for fundraising and strategic planning. Build your market sizing from the bottom up with segments, geographic reach, and growth projections." />
+        <meta property="og:description" content="Calculate your Total Addressable Market (TAM), Serviceable Available Market (SAM), and Serviceable Obtainable Market (SOM) for fundraising and strategic planning. Build your market sizing, segment by segment, with geographic reach and growth projections." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://tam.cquencehealth.com" />
         <meta property="og:site_name" content="CQuence Health" />
