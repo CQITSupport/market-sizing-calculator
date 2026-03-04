@@ -352,7 +352,7 @@ SOM: ${formatFullCurrency(calculations.projections[5].som)}`;
             <div className="h-px w-12 bg-gradient-to-l from-transparent to-[#0da4dd]"></div>
           </div>
           <p className="text-gray-600 max-w-xl mx-auto">
-            Build your market sizing from the bottom up, segment by segment.
+            Build your market sizing, segment by segment.
           </p>
         </div>
 
