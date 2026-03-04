@@ -6,7 +6,7 @@ export const metadata = {
   keywords: 'TAM, SAM, SOM, market sizing, startup, fundraising, market research, business planning, CQuence Health',
   openGraph: {
     title: 'Market Sizing Tool',
-    description: 'Build your market sizing from the bottom up, segment by segment.',
+    description: 'Build your market, segment by segment.',
     type: 'website',
     url: 'https://tam.cquencehealth.com',
     siteName: 'CQuence Health',
@@ -24,7 +24,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Market Sizing Tool',
-    description: 'Build your market sizing from the bottom up, segment by segment.',
+    description: 'Build your market, segment by segment.',
     images: ['https://tam.cquencehealth.com/opengraph-image.png'],
   },
 };
@@ -34,7 +34,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <head>
         <meta property="og:title" content="Market Sizing Tool" />
-        <meta property="og:description" content="Build your market sizing from the bottom up, segment by segment." />
+        <meta property="og:description" content="Build your market, segment by segment." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://tam.cquencehealth.com" />
         <meta property="og:site_name" content="CQuence Health" />
@@ -46,7 +46,7 @@ export default function RootLayout({ children }) {
         <meta property="og:image:alt" content="CQuence Health Market Sizing Tool" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Market Sizing Tool" />
-        <meta name="twitter:description" content="Build your market sizing from the bottom up, segment by segment." />
+        <meta name="twitter:description" content="Build your market, segment by segment." />
         <meta name="twitter:image" content="https://tam.cquencehealth.com/opengraph-image.png" />
       </head>
       <body>{children}</body>
